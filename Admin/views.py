@@ -17,6 +17,10 @@ from django.db.models import Q
 import os
 from django.utils.encoding import smart_str
 from django.shortcuts import get_object_or_404
+import json
+import io
+import zipfile
+from django.conf import settings
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -429,3 +433,40 @@ def download_any_txt_file(request, uuid):
                             filename=smart_str(os.path.basename(file_obj.txt_file.name)))
     
     return Response({'detail': 'Faqat adminlar uchun'}, status=status.HTTP_403_FORBIDDEN)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def download_merged_txt_files(request):
+    user = request.user
+    if not user.is_admin:
+        return Response({'detail': 'Faqat admin qila oladi'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Define the path to the mixed.json file
+    json_file_path = os.path.join(settings.MEDIA_ROOT, 'mixed', 'for_mixed.json')
+
+    if not os.path.exists(json_file_path):
+        return Response({'detail': 'for_mixed.json fayli topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            # Assuming data is a dictionary where each value has a 'text' key
+            texts_to_merge = [entry.get('text', '') for entry in data.values() if isinstance(entry, dict)]
+    except json.JSONDecodeError:
+        return Response({'detail': 'for_mixed.json faylini o`qishda xatolik.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    merged_text = "\n".join(texts_to_merge)
+
+    # Create a BytesIO buffer to store the zip file
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('merged.txt', merged_text)
+
+    # Set the buffer's pointer to the beginning
+    zip_buffer.seek(0)
+
+
+    response = FileResponse(zip_buffer, content_type='application/zip')
+    response['Content-Disposition'] = f'attachment; filename="merged_files.zip"'
+    return response

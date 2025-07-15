@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import logout_admin, download_any_base_file, download_any_txt_file, register_admin, login_admin, user_list, file_list,check_file,statistika,search_user,search_file, delete_user, create_user,delete_file, change_user
+from .views import logout_admin, download_any_base_file, download_any_txt_file, register_admin, login_admin, user_list, file_list,check_file,statistika,search_user,search_file, delete_user, create_user,delete_file, change_user, download_merged_txt_files
 
 urlpatterns = [
    path('register/',register_admin,name='admin__register'),
@@ -17,4 +17,5 @@ urlpatterns = [
    path('change_user/<str:username>/', change_user, name='change_user'),
    path('download_admin_base/<uuid:uuid>/', download_any_base_file, name='download_any_base_file'),
    path('download_admin_txt/<uuid:uuid>/', download_any_txt_file, name='download_any_txt_file'),
+   path('download_merged_txt/', download_merged_txt_files, name='download_merged_txt_files'),
 ]

@@ -19,12 +19,9 @@ from django.conf import settings
 from django.utils.encoding import smart_str
 from django.shortcuts import get_object_or_404
 import json
-<<<<<<< HEAD
 import io
 import zipfile
 from django.conf import settings
-=======
->>>>>>> 666eade (make a new endpoint)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

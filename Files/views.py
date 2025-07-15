@@ -227,3 +227,57 @@ def verify_file(request, uuid, value):
         "detail": f"Fayl {'tasdiqlandi' if file.is_verified else 'tasdiqlanmagan'}.",
         "is_verified": file.is_verified
     })
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_text(request, uuid):
+    try:
+        file_obj = File.objects.get(uuid=uuid, avtor=request.user)
+
+        if not file_obj.txt_file:
+            return Response({'error': 'txt_file hali mavjud emas'}, status=404)
+
+        file_path = file_obj.txt_file.path
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+
+        return Response({
+            'uuid': str(file_obj.uuid),
+            'text': text
+        })
+
+    except File.DoesNotExist:
+        return Response({'error': 'Fayl topilmadi yoki sizga tegishli emas'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def update_text(request):
+    uuid = request.data.get('uuid')
+    text = request.data.get('text')
+
+    if not uuid or text is None:
+        return Response({'error': 'uuid va text majburiy'}, status=400)
+
+    try:
+        file_obj = File.objects.get(uuid=uuid, avtor=request.user)
+
+        if not file_obj.txt_file:
+            return Response({'error': 'txt_file hali mavjud emas'}, status=404)
+
+        file_path = file_obj.txt_file.path
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(text)
+
+        return Response({'message': 'Matn muvaffaqiyatli yangilandi'})
+
+    except File.DoesNotExist:
+        return Response({'error': 'Fayl topilmadi yoki sizga tegishli emas'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

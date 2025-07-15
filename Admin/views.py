@@ -15,12 +15,16 @@ from django.db.models import Sum
 from Base.celery import app
 from django.db.models import Q
 import os
+from django.conf import settings
 from django.utils.encoding import smart_str
 from django.shortcuts import get_object_or_404
 import json
+<<<<<<< HEAD
 import io
 import zipfile
 from django.conf import settings
+=======
+>>>>>>> 666eade (make a new endpoint)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -179,11 +183,46 @@ def check_file(request, uuid,value):
                             status=status.HTTP_400_BAD_REQUEST)
 
         file.save()
+
+        mixed_dir = os.path.join(settings.MEDIA_ROOT, 'mixed')
+        os.makedirs(mixed_dir, exist_ok=True)
+        json_path = os.path.join(mixed_dir, 'for_mixed.json')
+
+        # Yoki mavjud jsonni o‘qiymiz
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        else:
+            data = {}
+
+        uuid_str = str(file.uuid)
+
+        # txt_file mavjud bo‘lsa va fayli bor bo‘lsa
+        if file.txt_file and os.path.exists(file.txt_file.path):
+            if file.is_verified:
+                # txt fayldan matnni o‘qib olish
+                with open(file.txt_file.path, 'r', encoding='utf-8') as f:
+                    text = f.read().strip()
+
+                # JSONga yozish
+                data[uuid_str] = {
+                    "file": os.path.basename(file.title),
+                    "text": text
+                }
+            else:
+                # Agar verified false bo‘lsa - jsondan olib tashlaymiz
+                data.pop(uuid_str, None)
+
+            # for_mixed.json ni qayta saqlaymiz
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
         return Response({
             "detail": f"Fayl {'tasdiqlandi' if file.is_verified else 'tasdiqlanmagan'}.",
             "is_verified": file.is_verified
         })
 
+        
     return Response({'detail':'Faqat admin qila oladi'},status=status.HTTP_400_BAD_REQUEST)
 
 

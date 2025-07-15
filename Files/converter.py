@@ -6,7 +6,7 @@ from PyPDF2 import PdfReader
 from docx import Document
 import openpyxl
 
-# ────────── Normalization helpers (DOCX / PDF) ──────────
+## ────────── Normalization helpers (DOCX / PDF) ────────── ##
 CITATION_PATTERN = re.compile(r"\[[0-9]+\]|\([^)]*\d{4}[^)]*\)")
 NUMBER_PATTERN   = re.compile(r"(?<!\d)\d+(?!\d)")
 SPECIALS         = re.compile(r"[^\w\u0400-\u04FF\s\.,;:!?\-'\"]")
@@ -35,12 +35,12 @@ def normalize_text(text: str) -> str:
     t = re.sub(r"\n{2,}", "\n\n", t)
     return t.strip()
 
-# ────────── Statistics ──────────
+# ────────── Statistics ────────── ##
 def text_stats(text: str):
     tokens = re.findall(r"\b\w+\b", text.lower())
     return len(tokens), len(set(tokens)), sum(1 for s in re.split(r"[.!?]+", text) if s.strip())
 
-# ────────── Main extractor / cleaner ──────────
+# ────────── Main extractor / cleaner ──────────##
 def extract_and_clean_text(file_path: str, ext: Optional[str] = None) -> Dict[str, Any]:
     """
     Return dict with keys:
@@ -52,7 +52,7 @@ def extract_and_clean_text(file_path: str, ext: Optional[str] = None) -> Dict[st
     path = Path(file_path)
     ext = (ext or path.suffix.lstrip('.')).lower()
 
-    # ---------- Extract ----------
+    # ---------- Extract ----------##
     if ext == "pdf":
         reader = PdfReader(path)
         raw = "\n".join(page.extract_text() or "" for page in reader.pages)

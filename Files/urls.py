@@ -12,4 +12,5 @@ urlpatterns = [
     path('verify/<uuid:uuid>/<str:value>/', verify_file, name='verify_file'),
     path('text/<uuid:uuid>/', get_text, name='get-text'),
     path('update/',update_text, name='update_text'),
+    
 ] 

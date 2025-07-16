@@ -5,9 +5,7 @@ from django.contrib.auth import get_user_model
 class UserAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'first_name', 'last_name', 'password']
-        read_only_fields = ['password']
-
+        fields = ['id', 'username', 'first_name', 'last_name',]
 
 User = get_user_model()
 

@@ -506,3 +506,32 @@ def download_merged_txt_files(request):
     response = FileResponse(zip_buffer, content_type='application/zip')
     response['Content-Disposition'] = f'attachment; filename="merged_files.zip"'
     return response
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_text(request, uuid):
+    user = request.user
+    if not user.is_admin:
+        return Response({'detail': 'Faqat admin qila oladi'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        file_obj = File.objects.get(uuid=uuid)
+
+        if not file_obj.txt_file:
+            return Response({'error': 'txt_file hali mavjud emas'}, status=404)
+
+        file_path = file_obj.txt_file.path
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+
+        return Response({
+            'uuid': str(file_obj.uuid),
+            'text': text
+        })
+
+    except File.DoesNotExist:
+        return Response({'error': 'Fayl topilmadi yoki sizga tegishli emas'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

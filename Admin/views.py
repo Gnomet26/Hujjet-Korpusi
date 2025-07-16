@@ -398,25 +398,24 @@ def delete_file(request, uuid):
 @api_view(['PUT', 'PATCH'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def change_user(request, username):
+def change_user(request, user_id):
     admin = request.user
     if not admin.is_admin:
         return Response({'detail': 'Faqat admin foydalanuvchini tahrirlashi mumkin'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        user = CustomUser.objects.get(username=username)
+        user = CustomUser.objects.get(id=user_id)
     except CustomUser.DoesNotExist:
         return Response({'detail': 'Bunday foydalanuvchi topilmadi'}, status=status.HTTP_404_NOT_FOUND)
-       #return Response({'detail': 'Bunday foydalanuvchi topilmadi'}, status=status.HTTP_404_NOT_FOUND) 
+
     serializer = ChangeAnyUserSerializer(user, data=request.data, partial=True)
 
     if serializer.is_valid():
         serializer.save()
         return Response({'message': 'Foydalanuvchi maʼlumotlari yangilandi'}, status=status.HTTP_200_OK)
-       #return Response({'message': 'Foydalanuvchi ma`lumotlari yangilandi'}, status=status.HTTP_200_OK)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-   #return Response(serilaizer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 @api_view(['GET'])

@@ -43,17 +43,6 @@ class File(models.Model):
                 self.file_size = 0
                 self.file_type = "unknown"
 
-        try:
-            if self.file_path and hasattr(self.file_path, 'open'):
-                ext = self.file_path.name.lower()
-                if ext.endswith((".txt", ".md", ".csv", ".py")):
-                    self.file_path.seek(0)
-                    self.content = self.file_path.read().decode('utf-8', errors='ignore')[:5000]
-                else:
-                    self.content = "📁 Fayl ko‘rish qo‘llab-quvvatlanmaydi."
-        except Exception:
-            self.content = "📁 Faylni o‘qishda xatolik yuz berdi."
-
         super().save(*args, **kwargs)
 
     def __str__(self):

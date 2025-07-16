@@ -281,3 +281,28 @@ def update_text(request):
         return Response({'error': 'Fayl topilmadi yoki sizga tegishli emas'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+    
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def set_or_edit_content(request, uuid):
+    user = request.user
+    description = request.data.get('description')
+
+    if description is None:
+        return Response({'detail': 'description maydoni talab qilinadi'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        obj = File.objects.get(uuid=uuid)
+    except File.DoesNotExist:
+        return Response({'detail': 'Obyekt topilmadi'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Foydalanuvchi o‘zining fayliga murojaat qilganini tekshirish
+    if obj.owner != user:
+        return Response({'detail': 'Siz bu resursga ruxsatga ega emassiz'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Contentni yangilash
+    obj.content = description
+    obj.save()
+
+    return Response({'message': 'Content muvaffaqiyatli yangilandi'}, status=status.HTTP_200_OK)

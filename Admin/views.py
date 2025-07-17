@@ -134,7 +134,8 @@ def search_file(request):
     files = File.objects.all().order_by('id')
 
     if query:
-        files = files.filter(title__icontains=query)
+        files = files.filter(
+        Q(title__icontains=query) | Q(description__icontains=query))
 
         paginator = PageNumberPagination()
         paginator.page_size = 10  # istasangiz sozlamadan oling

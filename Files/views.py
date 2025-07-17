@@ -14,6 +14,7 @@ from .models import File
 from django.shortcuts import get_object_or_404
 from django.http import FileResponse, Http404
 from django.utils.encoding import smart_str
+from django.db.models import Q
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
@@ -111,7 +112,9 @@ def search_files(request):
 
     files = File.objects.filter(avtor=user)
     if search_query:
-        files = files.filter(title__icontains=search_query)
+       files = files.filter(
+        Q(title__icontains=search_query) | Q(description__icontains=search_query)
+    )
 
     files = files.order_by('-created_at')
 
@@ -285,7 +288,7 @@ def update_text(request):
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def set_or_edit_content(request, uuid):
+def set_or_edit_description(request, uuid):
     user = request.user
     description = request.data.get('description')
 
@@ -298,11 +301,11 @@ def set_or_edit_content(request, uuid):
         return Response({'detail': 'Obyekt topilmadi'}, status=status.HTTP_404_NOT_FOUND)
 
     # Foydalanuvchi o‘zining fayliga murojaat qilganini tekshirish
-    if obj.owner != user:
+    if obj.avtor != user:
         return Response({'detail': 'Siz bu resursga ruxsatga ega emassiz'}, status=status.HTTP_403_FORBIDDEN)
 
     # Contentni yangilash
-    obj.content = description
+    obj.description = description
     obj.save()
 
     return Response({'message': 'Content muvaffaqiyatli yangilandi'}, status=status.HTTP_200_OK)

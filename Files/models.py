@@ -22,7 +22,7 @@ class File(models.Model):
     file_type = models.CharField(max_length=20)
     file_size = models.BigIntegerField(null=True, blank=True)
     title = models.CharField(max_length=255)
-    content = models.TextField(blank=True)
+    description = models.TextField(blank=True,null=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     is_verified = models.BooleanField(default=False)
 

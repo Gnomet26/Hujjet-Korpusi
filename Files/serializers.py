@@ -20,7 +20,7 @@ class FileSerializer(serializers.ModelSerializer):
             'status',
             'created_at',
             'file_path',
-            'content',
+            'description',
             'download_url',
             'is_verified',
             'token_count',       # ✅ Qo‘shildi

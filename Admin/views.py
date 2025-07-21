@@ -14,14 +14,13 @@ from Files.models import File
 from django.db.models import Sum
 from Base.celery import app
 from django.db.models import Q
+from celery.result import AsyncResult
 import os
 from django.conf import settings
 from django.utils.encoding import smart_str
 from django.shortcuts import get_object_or_404
 import json
-import io
-import zipfile
-from django.conf import settings
+from .tasks import generate_merged_txt_zip
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -118,31 +117,33 @@ def search_user(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
 @authentication_classes([TokenAuthentication])
-def search_file(request):
-
+@permission_classes([IsAuthenticated])
+def search_files(request):
     user = request.user
     if user.is_admin:
-        user = request.user
+        search_query = request.GET.get('args', '').strip().lower()
 
-    if not user.is_admin:
-        return Response({'detail': 'Faqat admin ko‘ra oladi'}, status=400)
+        files = File.objects.all()
+        if search_query:
+            results = []
 
-    query = request.GET.get('args', '').strip()
+            for f in files:
+                title_text = f.title.lower()
+                description_text = f.description.lower()
 
-    files = File.objects.all().order_by('id')
+                # Shart: qisman mos kelsa ham bo‘ladi (masalan: 'hell' => 'hello', '21' => '21-leksiya')
+                if search_query in title_text or search_query in description_text:
+                    results.append(f.id)
 
-    if query:
-        files = files.filter(
-        Q(title__icontains=query) | Q(description__icontains=query))
+            files = files.filter(id__in=results)
+
+        files = files.order_by('-created_at')
 
         paginator = PageNumberPagination()
-        paginator.page_size = 10  # istasangiz sozlamadan oling
+        paginated_files = paginator.paginate_queryset(files, request)
 
-        result_page = paginator.paginate_queryset(files, request)
-        serializer = FileSerializer(result_page, many=True)
-
+        serializer = FileSerializer(paginated_files, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data)
     return Response({'detail':'Faqat admin ko`ra oladi'},status=status.HTTP_400_BAD_REQUEST)
 
@@ -152,11 +153,16 @@ def search_file(request):
 def file_list(request):
     user = request.user
     if user.is_admin:
-        files = File.objects.all().order_by('id')
-        paginator = PageNumberPagination()
-        result_page = paginator.paginate_queryset(files,request)
-        serializer = FileSerializer(result_page, many=True)
-        return paginator.get_paginated_response(serializer.data)
+        try:
+            user_files = File.objects.all().order_by('id')
+
+            paginator = PageNumberPagination()
+            paginated_files = paginator.paginate_queryset(user_files, request)
+
+            serializer = FileSerializer(paginated_files, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
+        except:
+            return Response({'error':'Server error'},status=status.HTTP_400_BAD_REQUEST)
     return Response({'detail':'Faqat admin ko`ra oladi'},status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
@@ -470,42 +476,62 @@ def download_any_txt_file(request, uuid):
     
     return Response({'detail': 'Faqat adminlar uchun'}, status=status.HTTP_403_FORBIDDEN)
 
-@api_view(['GET'])
+
+@api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def download_merged_txt_files(request):
+def start_merge_task(request):
     user = request.user
     if not user.is_admin:
         return Response({'detail': 'Faqat admin qila oladi'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Define the path to the mixed.json file
-    json_file_path = os.path.join(settings.MEDIA_ROOT, 'mixed', 'for_mixed.json')
-
-    if not os.path.exists(json_file_path):
-        return Response({'detail': 'for_mixed.json fayli topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
-
-    try:
-        with open(json_file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            # Assuming data is a dictionary where each value has a 'text' key
-            texts_to_merge = [entry.get('text', '') for entry in data.values() if isinstance(entry, dict)]
-    except json.JSONDecodeError:
-        return Response({'detail': 'for_mixed.json faylini o`qishda xatolik.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    merged_text = "\n".join(texts_to_merge)
-
-    # Create a BytesIO buffer to store the zip file
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr('merged.txt', merged_text)
-
-    # Set the buffer's pointer to the beginning
-    zip_buffer.seek(0)
+    task = generate_merged_txt_zip.delay()
+    return Response({'task_id': task.id}, status=status.HTTP_202_ACCEPTED)
 
 
-    response = FileResponse(zip_buffer, content_type='application/zip')
-    response['Content-Disposition'] = f'attachment; filename="merged_files.zip"'
-    return response
+from celery.result import AsyncResult
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def check_merge_task_status(request, task_id):
+    user = request.user
+    if not user.is_admin:
+        return Response({'detail': 'Faqat admin qila oladi'}, status=status.HTTP_403_FORBIDDEN)
+    result = AsyncResult(task_id)
+
+    response_data = {
+        'task_id': task_id,
+        'state': result.state,
+    }
+    return Response(response_data)
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def download_merged_zip(request):
+    user = request.user
+    if not user.is_admin:
+        return Response({'detail': 'Faqat admin qila oladi'}, status=status.HTTP_403_FORBIDDEN)
+
+    task_id = request.query_params.get('task_id')
+    if not task_id:
+        return Response({'detail': 'task_id query param kerak.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Task holatini tekshirish
+    result = AsyncResult(task_id)
+    if result.state != 'SUCCESS':
+        return Response({'detail': f'Task hali tugamagan. Holati: {result.state}'}, status=status.HTTP_202_ACCEPTED)
+
+    zip_path = os.path.join(settings.MEDIA_ROOT, 'merged_files.zip')
+    if not os.path.exists(zip_path):
+        return Response({'detail': 'Fayl topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return FileResponse(open(zip_path, 'rb'), as_attachment=True, filename='merged_files.zip')
+
+
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])

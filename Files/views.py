@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404
 from django.http import FileResponse, Http404
 from django.utils.encoding import smart_str
 from django.db.models import Q
+import re
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
@@ -98,23 +99,28 @@ def check_file_status(request, file_id):
     except File.DoesNotExist:
         return Response({"error": "Fayl topilmadi"}, status=404)
     
-
-
-from django.http import FileResponse
-from django.utils.encoding import smart_str
     
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def search_files(request):
     user = request.user
-    search_query = request.GET.get('file_name', '').strip()
+    search_query = request.GET.get('args', '').strip().lower()
 
     files = File.objects.filter(avtor=user)
+
     if search_query:
-       files = files.filter(
-        Q(title__icontains=search_query) | Q(description__icontains=search_query)
-    )
+        results = []
+
+        for f in files:
+            title_text = f.title.lower()
+            description_text = f.description.lower()
+
+            # Shart: qisman mos kelsa ham bo‘ladi (masalan: 'hell' => 'hello', '21' => '21-leksiya')
+            if search_query in title_text or search_query in description_text:
+                results.append(f.id)
+
+        files = files.filter(id__in=results)
 
     files = files.order_by('-created_at')
 
@@ -123,7 +129,6 @@ def search_files(request):
 
     serializer = FileSerializer(paginated_files, many=True, context={'request': request})
     return paginator.get_paginated_response(serializer.data)
-
 
 @api_view(['DELETE'])
 @authentication_classes([TokenAuthentication])

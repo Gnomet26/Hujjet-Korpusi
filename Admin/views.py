@@ -6,7 +6,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import UserAdminSerializer, ChangeAnyUserSerializer
+from .serializers import RegisterAdminSerializer, UserAdminSerializer, ChangeAnyUserSerializer
 from Users.models import CustomUser
 from rest_framework.pagination import PageNumberPagination
 from Files.serializers import FileSerializer
@@ -29,7 +29,7 @@ def register_admin(request):
 
     data = request.data
 
-    serializer = RegisterSerializer(data = data)
+    serializer = RegisterAdminSerializer(data = data)
     if serializer.is_valid():
         user = serializer.save()
         token, created = Token.objects.get_or_create(user=user)
@@ -50,7 +50,7 @@ def login_admin(request):
         if user.is_admin:
             token, created = Token.objects.get_or_create(user = user)
             return Response({'token':token.key},status=status.HTTP_200_OK)
-        return Response({'detail':'faqat admin kira oladi'})
+        return Response({'detail':'faqat admin kira oladi'}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -65,7 +65,7 @@ def logout_admin(request):
         # Tokenni o‘chiramiz
         user.auth_token.delete()
         return Response({'detail': 'Admin muvaffaqiyatli logout qilindi'}, status=status.HTTP_200_OK)
-    
+
     return Response({'detail': 'Faqat admin logout qilishi mumkin'}, status=status.HTTP_403_FORBIDDEN)
 
 
